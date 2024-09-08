@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <title>Rails: Assets Pipeline a través del tiempo</title>
+
+    <meta
+      name="description"
+      content="Slides para la charla sobre la evolución del Assets Pipeline a través del tiempo"
+    />
+    <meta name="author" content="Ariel Juodziukynas" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="stylesheet" href="./reset.css" />
+    <link rel="stylesheet" href="./reveal.css" />
+    <link rel="stylesheet" href="./theme/white.css" id="theme" />
+
+    <!-- Theme used for syntax highlighting of code -->
+    <link
+      rel="stylesheet"
+      href="plugin/highlight/monokai.css"
+      id="highlight-theme"
+    />
+
+    <style>
+      body {
+        background: rgb(255, 255, 255);
+      }
+
+      #first h1 {
+        text-transform: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-right: 1em;
+      }
+      #first h1 img {
+        height: 1em;
+      }
+
+      section li {
+        font-size: 30px;
+      }
+    </style>
+  </head>
+
+  <body class="clear-background">
+    <div class="reveal">
+      <!-- Any section element inside of this container is displayed as a slide -->
+      <div class="slides">
+        <section data-background-color="lightgray" id="first">
+          <h1>Actualizando Ruby y Rails usando Dual-Booting</h1>
+        </section>
+
+        <section>
+          <p>Yo: Ariel Juodziukynas</p>
+          <p>OmbuLabs.com/FastRuby.io</p>
+
+          <p>
+            Slides en:
+            <a href="" target="_blank">github.com/arielj/actulizar_dual_boot</a>
+          </p>
+        </section>
+
+        <section>
+          <section>
+            <h2>Técnicas para actualizar</h2>
+          </section>
+
+          <section>
+            <h3>Reescribir la app</h3>
+
+            <ul>
+              <li class="fragment">PAREN TODO!</li>
+              <li class="fragment">El scope es muy grande</li>
+              <li class="fragment">Son los tests 100% confiables?</li>
+              <li class="fragment">
+                Simple para reescribir? simple para actualizar
+              </li>
+              <li class="fragment">Sin plan, el problema vuelve</li>
+              <li class="fragment">No termina hasta que está completo</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Actualizar a la versión más nueva</h3>
+
+            <ul>
+              <li class="fragment">Perdemos deprecation warnings</li>
+              <li class="fragment">
+                Las guías oficiales son para versiones puntuales
+              </li>
+              <li class="fragment">Automatizaciones</li>
+              <li class="fragment">El scope es grande</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Actualizar a la versión siguiente</h3>
+
+            <ul>
+              <li class="fragment">Deprecation warnings nos guían</li>
+              <li class="fragment">Guías oficiales</li>
+              <li class="fragment">Automatizaciones</li>
+              <li class="fragment">Scope reducido</li>
+            </ul>
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <p>El mayor problema con todas estas técnicas: branch de upgrade</p>
+          </section>
+
+          <section>
+            <h2>Qué es Dual-Booting?</h2>
+
+            <ul>
+              <li class="fragment">
+                Permite ejecutar la aplicación en distintas versiones de Rails,
+                Ruby (o cualquier gema) sin cambiar branches.
+              </li>
+              <li class="fragment">
+                Bundler carga las gemas listadas en el archivo Gemfile.lock por
+                defecto, pero se puede cambiar con la variable de entorno
+                BUNDLE_GEMFILE.
+              </li>
+              <li class="fragment">
+                Podemos ejecutar código diferente dependiendo de la versión en
+                una misma codebase.
+              </li>
+              <li class="fragment">
+                Soluciona el problema del branch de upgrade y permite hacer
+                merge de código para la próxima versión.
+              </li>
+              <li class="fragment">
+                Permite a todos familiarizarse con código más moderno durante el
+                proceso.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Ejemplo práctico</h3>
+
+            <ul>
+              <li class="fragment">Gemfile vs Gemfile.next</li>
+              <li class="fragment">Crear el archivo Gemfile.next</li>
+              <li class="fragment">Crear el archivo Gemfile.next.lock</li>
+              <li class="fragment">Condicionales en el Gemfile</li>
+              <li class="fragment">Condicionales en el código</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>El final del upgrade</h3>
+
+            <ul>
+              <li class="fragment">Reemplazar Gemfile.lock</li>
+              <li class="fragment">Borrar condicioneles</li>
+              <li class="fragment">Cualquier task que corresponda</li>
+              <li class="fragment">Dual boot con la versión siguiente</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Actualizar Ruby</h3>
+
+            <ul>
+              <li class="fragment">
+                No alcanza con la variable BUNDLE_GEMFILE
+              </li>
+              <li class="fragment">Docker Compose</li>
+              <li class="fragment">
+                No siempre se necesita un Gemfile.next, pero en muchos casos si
+              </li>
+            </ul>
+          </section>
+        </section>
+
+        <section>
+          <h2>Más tips para actualizar</h2>
+
+          <ul>
+            <li class="fragment">Si es posible, actualizar Ruby primero</li>
+            <li class="fragment">Última versión patch</li>
+            <li class="fragment">Deprecation warnings</li>
+            <li class="fragment">`next_rails`</li>
+            <li class="fragment">Monkey Patching</li>
+            <li class="fragment">Backporting</li>
+            <li class="fragment">new_framework_defaults</li>
+            <li class="fragment">Cambios en el schema</li>
+            <li class="fragment">Analizar qué actualizar</li>
+            <li class="fragment">Cambios no documentados</li>
+            <li class="fragment">Paciencia</li>
+          </ul>
+        </section>
+
+        <section>
+          <iframe
+            src="https://giphy.com/embed/KJ1f5iTl4Oo7u"
+            width="250"
+            style="display: inline-block; vertical-align: top"
+            frameborder="0"
+            class="giphy-embed"
+            allowfullscreen
+          ></iframe>
+
+          <figure style="display: inline-block">
+            <img
+              src="./images/qr.png"
+              style="margin: 0; width: 200px"
+              alt="https://arielj.github.io/assets-pipeline-history"
+            />
+          </figure>
+
+          <h2>Preguntas?</h2>
+
+          <ul>
+            <li>
+              <span>Blog de FastRuby.io</span><br />
+              <a
+                href="https://www.fastruby.io/search?query=dual"
+                target="_blank"
+                >www.fastruby.io/search?query=dual</a
+              >
+            </li>
+            <li>
+              <span>Rails Guides: Upgrading Ruby on Rails</span><br />
+              <a
+                href="https://guides.rubyonrails.org/v7.1/upgrading_ruby_on_rails.html"
+                target="_blank"
+                >guides.rubyonrails.org/v7.1/upgrading_ruby_on_rails.html</a
+              >
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h1>Dejanos tus comentarios</h1>
+          <img
+            src="./images/qr-rubysur.png"
+            alt="https://docs.google.com/forms/d/e/1FAIpQLScD-7GXHOB1BkAJLBWmWzQfwX0ABiTYzySqYxvsC4saVLBnMA/viewform"
+          />
+        </section>
+      </div>
+    </div>
+
+    <script src="./reveal.js"></script>
+    <script src="plugin/zoom/zoom.js"></script>
+    <script src="plugin/notes/notes.js"></script>
+    <script src="plugin/search/search.js"></script>
+    <script src="plugin/markdown/markdown.js"></script>
+    <script src="plugin/highlight/highlight.js"></script>
+    <script>
+      // Also available as an ES module, see:
+      // https://revealjs.com/initialization/
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        center: true,
+        hash: true,
+
+        // Learn about plugins: https://revealjs.com/plugins/
+        plugins: [
+          RevealZoom,
+          RevealNotes,
+          RevealSearch,
+          RevealMarkdown,
+          RevealHighlight,
+        ],
+      });
+
+      Reveal.on("slidechanged", (event) => {
+        if (event.indexh == 0) {
+          document.body.classList.add("clear-background");
+        } else {
+          document.body.classList.remove("clear-background");
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,156 @@
+# Intro
+
+Soy ariel, trabajo para .... Para los que no conocen, uno de nuestros principales servicios es actualizar aplicaciones con Rails.
+
+Antes que nada, el código de los slides está en esta url o en este QR, y ahí mismo está el link para ver los slides.
+
+# Técnicas
+
+## 1 - Reescribir la app
+
+Cuando alguien pregunta cómo actualizar una app desde una versión vieja de Rails, es muy común ver sugerencias del estilo "reescribí la app" o "creá una app nueva y copiá el código del a vieja" o comentarios así. Pero hay muchos problemas con esto:
+
+- Se tiene que detener completamente el desarrollo de cualquier otra feature o bugfix
+- Es muy fácil crear problemas al reescribir todo (que no es lo mismo que reescribir partes puntuales con refactors)
+- Si la test suit no es realmente buena, es muy fácil perder funcionalidades
+- Si la aplicación es tan simple como para poder reescribirla en poco tiempo, seguramente sea fácil actualizarla también. Muchos de los problemas que ocurren al actualizar se relacionan a dependencias y cambios que se tienen que hacer si o si, y los cambios se van a necesitar tanto al reescribir o al actualizar.
+- Si la única idea es reescribir en lugar de mantenerse actualizado, en un par de años la app va a estar en la misma situación
+- No se termina hasta que está todo re-escrito
+
+## 2 - Actualizar a la última versión de una
+
+Esta opción es mejor que reescribir todo, pero al saltearse las versiones intermedias se va perdiendo un montón de información que los desarrolladores agregan en el código o en documentación para ayudarnos a actualizar: deprecation warnings, guías de updates, scripts para migraciones automáticas, etc. El mayor riesgo al usar esta técnica es que la cantidad de cambios que se necesitan suele ser muy grande, y si aparece un problema es más difícil encontrar la razón porque las posibilidades son muchas: "Esta sintaxis ya no sirve? esta gema ya no es compatible? hay un bug conocido?"
+
+## 3 - Actualizar de a una versión a la siguiente
+
+Esta opción es la más segura: en cada versión tenemos mucha información sobre cómo actualizar a la siguiente versión menor, y esa información se suele perder al actualizar para ser reemplazada con información para actualizar a la siguiente. Las deprecation warnings son muy importantes, pero también distintas gemas puede tener pasos específicos para actualizar, versiones puntuales en las que una transición es más fácil, etc.
+
+# Dual Booting
+
+Con cualquiera de las dos técnicas para actualizar (no reescribir), en ambos casos tenemos unos problemas:
+
+- si actualizar se vuelve un proyecto largo, tenemos que o frenar el desarrollo de otras features o bugs, o tenemos que continuar actualizando el branch donde se está actualizando con los nuevos cambios, teniendo que lidiar con nuevo código que re-introduce problemas que ya resolvimos
+- sólo se termina cuando se completó el proceso y el branch se aprobó testeó y pasó QA
+
+La idea de Dual Booting es resolver esos dos problemas permitiendo preparar la app para poder ir actualizando partes del código agregando código nuevo al mismo tiempo que el código viejo sigue en uso.
+
+
+## La base del dual Booting
+
+Bundler se encarga de indicarle a Ruby qué gemas usar y dónde están. La forma de Bundler de obtener esa información es usando el archivo `Gemfile.lock` por defecto. Esto se puede cambiar con una variable de entorno: `BUNDLE_GEMFILE`.
+
+En general voy a mencionar ejemplo de actualizar Rails, pero esto se puede usar para actualizar cualquier gema, no sólo Rails. Voy a hablar un poquito más de esto más adelante y también sobre cómo actualizar Ruby con dual booting.
+
+La idea principal del dual booting ese tener dos `Gemfile.lock` (vamos a llamar `Gemfile.lock` al viejo y `Gemfile.next.lock` al nuevo), y en base a esa variable de entorno podemos decidir qué gemas usar y qué código ejecutar.
+
+Por lo tanto necesitamos esto:
+- Un archivo `Gemfile` para especificar las gemas que queremos en la versión actual/vieja
+- Un archivo `Gemfile.next` (or el nombre que más les guste) para las gemas de la versión siguiente/nueva
+- En base a esos archivos, bundler va a generar los `.lock` con la totalidad de las gemas con dependencias y las versiones exactas que se van a usar en cada caso.
+
+Luego, en el código, podemos usar `if` statements y ejecutar código diferente dependiendo de la versión que se está ejecutando.
+
+Luego de este setup, podemos ejecutar `rails s` (o `BUNDLE_GEMFILE=Gemfile rails s`) para ejecutar la versión actual de la app, y `BUNDLE_GEMFILE=Gemfile.next rails s` para ejecutar la app usando la próxima versión. De la misma forma podemos agregar esa variable de entorno a cualquier comando que queramos ejecutar como `BUNDLE_GEMFILE=Gemfile.next bundle install` o `BUNDLE_GEMFILE=Gemfile.next sidekiq`, por ejemplo.
+
+
+## Gemfile y Gemfile.next
+
+Para evitar tener que mantener dos archivos diferentes, una buena práctica es que `Gemfile.next` sea un symlink que apunte a `Gemfile`, y luego usar condicionales dentro del Gemfile para definir distintas versiones de nuestras dependencias según haga falta.
+
+
+## Gemfile.lock y Gemfile.next.lock
+
+Estos dos archivos si o si tienen que ser diferentes, pero no es problema mantenerlos porque Bundler se encarga de actualizarlos automáticamente al ejecutar `bundle install` o `BUNDLE_GEMFILE=Gemfile.next bundle install`
+
+Lo que hay que tener cuidado con estos archivos es cómo generamos el archivo `Gemfile.next.lock`. Cuando ejecutamos `BUNDLE_GEMFILE=Gemfile.next bundle install`, bundler tiene dos casos posible:
+- Si el archivo `.lock` existe, va a intentar instalar las versiones definidas y listo
+- Si el archivo `.lock` NO existe, va a analizar las dependencias, crear el archivo con la última versión posible de cada dependencia que satisfaga la resolución, y luego instalarlas.
+
+El problema al generar un archivo `.lock` es que podemos terminar con versiones más nuevas de gemas que no necesitamos actualizar en este momento y sólo agregan más cambios y posibles problemas durante el upgrade.
+
+Lo que queremos hacer en este caso es reducir al mínimo la cantidad de cambios que manejamos en un momento dado. Por ejemplo: Si quiero actualizar Rails de 7.0 a 7.1, seguramente no necesite actualizar Paperclip de 3.0 a 6.0 en este momento, actualizar esa gema puede esperar. Esto reduce la cantidad de cosas que nos tenemos que preocupar en un momento dado y nos permite enfocarnos en el objetivo principal. Pasa mucho que algunas gemas si se tienen que actualizar a la vez y está bien hacerlo si es necesario, pero idealmente queremos evitar los cambios que no se necesitan ya mismo y dejarlos para después.
+
+
+Veamos un ejemplo práctico:
+- Vamos a usar esta app que usé de ejemplo para una charla anterior
+- La app usa Rails 7.0 y hace más de un año que no se tocó, así que tiene varias gemas desactualizadas y, con el objetivo del ejemplo, supongamos que usa la gema `composite_primary_keys` para gener claves primarias compuestas en lugar de un sólo campo.
+
+Nuestro objetivo es actualizar a Rails 7.1, y vamos a configurar el dual-booting para poder hacer los cambios bien graduales y poder ejecutar todo en ambas versiones para poder iterar rápido.
+
+- Lo primero que hacemos es crear el archivo Gemfile.next, es un symlink que apunta a `Gemfile`.
+- Luego agregamos una función que vamos a usar como condicional en todas las partes que necesitemos especificar una versión distinta de una gema
+- Entonces el primer condicional es siempre el de la gema que queramos actualizar, en este caso Rails, ponemos `if next?` y configuramos distintas versiones en cada caso
+- Analizando las dependencias también notamos que la gema `composite_primary_keys` no soporta Rails 7.1, porque en Rails 7.1 se agregó el soporte de claves compuestas como parte de Rails, entonces necesitamos decirle a bundler que NO queremos esa gema en la próxima version: agregamos `unless next?`...
+
+Ahora podemos correr `bundle install` con la versión nueva, pero en una de las slides anteriores comenté que esto así solo puede generar que se actualicen cosas que no necesitamos actualizar YA, agregando más puntos de posibles problemas.
+
+Entonces volvamos un paso para atrás y veamos otra forma:
+- copiamos el archivo `Gemfile.lock` como `Gemfile.next.lock`
+- `bundle install` ahora va a fallar, porque en el .lock bundler entiende que queremos usar rails 7.0, pero en el Gemfile.next entiende que queremos 7.1
+- con `bundle update rails` le decimos a bundler que actualice rails y las cosas que necesite actualizar (existe la opción --conservative para ser incluso más restrictivos en qué actualiza)
+- ahora podemos ver que con esta forma, hay muchos menos cambios de versiones
+
+Otra cosa importante es que el Gemfile.next.lock NO include ya gema composit_primary_keys.
+
+Por ahora sólo le dijimos a Bundler qué gemas queremos, pero tenemos un nuevo problema, la gema `composite_primary_keys` se configura distinta al feature nativo de Rails, entonces necesitamos agregar un condicional en el código. A mi me gusta usar este patrón, pero pueden usar cualquier forma que se les ocurra si no les gusta la idea de una variable global.
+
+Ahora en el código podemos hacer esto:
+
+Bien, ahora lo que queda es ejecutar los tests en ambas versiones, pero al intentarlo en la versión nueva tenemos un problema, puma no es compatible con rack 3. Entonces podemos agregar otro condicional para usar puma 6 en con rails 7.1 y puma 5 con 7.0. Acá ya se entra en un terreno que depende mucho de qué tanto queremos actualizar a la vez. Tranquilamente se podría primero hacer un update de puma para usar puma 6 con Rails 7.0, y luego intentar actualizar Rails, eso ya depende de cada uno. En mi experiencia, mientras menos cosas se actualicen a la vez, mejor, pero también lleva más tiempo, todo tiene trade-offs.
+
+## next_rails
+
+Algunos de los cambios que mostré se pueden automatizar usando la gema `next_rails`, que además tiene otros features relacionados a actualizaciones: como un tracker de deprecations, un comando para detectar gemas incompatibles, un comando `next` para evitar escribir el prefijo `BUNDLE_GEMFILE=Gemfile.next` a cada rato, y algunos detalles más.
+
+Es una gema mantenida por FastRuby.
+
+## Terminar el upgrade
+
+Bueno, ya tenemos la base para actualizar la app. Ahora falta ponerse a arreglar los tests, a hacer QA, arreglar cualquier problema que aparezca, etc. Repetir hasta que se llegue a un estado en el que decidimos que a la app está lista para moverse a la próxima versión de forma completa.
+
+Ahora hay que hacer varios pasos:
+- Primero hay que borrar el `Gemfile.lock` viejo y reemplazarlo por el `Gemfile.next.lock`, porque este tiene las gemas que queremos
+- Además hay que recorrer tódo el código y elimiar los condicionales y cualquier otro código que sea específico para la versión vieja
+- Luego puede haber cambios puntuales que se necesiten hacer que varían para cada app, capaz hay que correr migrations en producción por ejemplo
+
+- Finalmente, podemos configurar el dual-boot ya para la próxima versión o eliminarlo completamente. Y si ya estamos en la última versión de Rails, podemos hacer dual boot con el branch `main` de rails en github, y tener nuestra app siempre testeada contra `main` por ejemplo para que, cuando una nueva versión de Rails se lance, ya tengamos nuestro código testeado y compatible.
+
+# Más cosas a tener en cuenta
+
+## Actualizar Ruby
+
+También se puede usar dual booting para actualizar la versión de Ruby, pero no alcanza con cambiar la variable BUNDLE_GEMFILE, también hay que cambiar de versión de ruby para cada ejecución. En muchos casos tampoco es necesario tener distintos gemfiles al actualizar Ruby, porque puede ser que todas las versiones de las gemas ya sean compatibles con ambas versiones de Ruby, pero puede pasar que se necesite, esto va a depender de cada caso (siempre se puede tener un Gemfile.next igual al Gemfile si no se necesitan cambios).
+
+Usar Docker es muy práctico para esto porque podemos configurar distintas imagenes con las dos versiones de Ruby y ejecutarlos incluso en paralelo.
+
+No son muchos los cambios que se necesitan pero como no es 100% necesario no lo voy a cubrir en detalle en la charla, pero en el blog de fastruby tenemos varios artículos sobre esto (los voy a linkear al final de los slides)
+
+## Cambios en la DB
+
+A veces durante un upgrade, alguna gema necesita hacer cambios en la DB, en estos casos es mejor actualizar esa gema primero si es posible.
+
+## Deprecation warnings
+
+SIEMPRE es importante resolver las deprecation warnings que aparezcan en la versión actual antes de actualizar. Resolver deprecation warnings literalmente significa actualizar el código de forma vieja de escribirlo a una nueva que va a ser compatible con la versión siguiente. Y es mucho mucho más fácil resolver un deprecation warning que encontrarse con un problema en la versión siguiente y tener que debuggear qué pasó.
+
+Así que es importante revisar que las deprecation warnings no estén silenciadas.
+
+Otra cosa que hay que tener en cuenta con este tema es que al mismo tiempo se va a agregándo nuevo código, y el nuevo código puede re-introducir deprecation warnings que ya habíamos resuelto. En versiones nuevas, Rails provee la configuración `disallowed_deprecations` para hacer que se produzca un error en deprecations específicas en lugar de sólo imprimirlas en los logs. Para versiones viejas hay que definir un behavior custom para tener una funcionalidad parecida y lo pueden ver en detalle en este blog post.
+
+## Money Patching
+
+A veces, hacer "lo correcto" puede demorar más la actualización de lo que necesitamos. En algunos casos se puede usar monkey patching para hacer cambios en el código y desbloquear el proceso, pero es muy importante documentar el patch, con información claro sobre por qué se hizo, en qué momento y en qué condiciones se puede eliminar, y qué sería la versión correcta (sin el monkey patch). La idea es que el monkey patch sea sólo temporal porque a la larga pueden traer problemas. Un ejemplo práctico por ejemplo es cuando Rails arregla un problema pero nuestro código no está preparado para funcionar sin ese problema, por ejemplo: en Rails 4 (creo), el equipo de Rails arregló un error en que los after_commit callbacks no se ejecutaban durante los tests, esto cambia nuestros tests que ahora van a ejecutar más código que antes, y pueden romper muchas cosas se nuestro setup no está listo para procesar los after_commit. En este caso se podría hacer un monkey patch que deshabilite los after_commit durante los tests, y luego, con más tiempo, arreglar los tests.
+
+## Backporting
+
+Ya vimos que en algunas partes del código vamos a tener que usar condicionales para usar código distinto para hacer lo mismo en las distintas versiones. A veces, en lugar de agregar un condicional, podemos hacer un monkey patch pero en lugar de para cambiar el código nuevo, para cambiar el código viejo, y así poder usar una funcionalidad nueva en la versión anterior. De esta forma podemos evitar repetir el código muchas veces y, al momento de quitar el código viejo, la app queda lista.
+
+## framework defaults
+
+A partir de rails 5 (creo), el equipo de Rails definió un proceso específico para sobre cómo adoptar los nuevos defaults al actualizar versiones:
+- Rails genera un initializer llamado `new_framework_defaults.rb` con todos los defaults de la nueva versión documentados y desactivados
+- Luego, una vez que el update se terminó (en nuestro caso sería cuando ya removimos todo el código de Rails 7.0 y tenemos sólo 7.1 configurado), podemos ir descomentando cada uno de esos settings uno por uno para verificar si se necesita ajustar algo
+- Una vez que hayamos revisado todos los settings de ese archivo, se puede eliminar y cambiar la configuración `load_defaults` en `application.rb` para indicar que queremos usar los defaults de la versión actual y no de la anterior.
+
+También es importante entender que los framework defaults son defaults pero eso no significa que si o si se tienen que usar (si no no serían configuraciones). Es totalmente válido no adoptar alguno de los nuevos defaults si eso no es lo que se necesita en nuestra aplicación.
+

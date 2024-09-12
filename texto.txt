@@ -73,14 +73,14 @@ Lo que queremos hacer en este caso es reducir al mínimo la cantidad de cambios 
 
 Veamos un ejemplo práctico:
 - Vamos a usar esta app que usé de ejemplo para una charla anterior
-- La app usa Rails 7.0 y hace más de un año que no se tocó, así que tiene varias gemas desactualizadas y, con el objetivo del ejemplo, supongamos que usa la gema `composite_primary_keys` para gener claves primarias compuestas en lugar de un sólo campo.
+- La app usa Rails 7.0 y hace más de un año que no se tocó, así que tiene varias gemas desactualizadas y, con el objetivo del ejemplo, supongamos que usa la gema `normalizy` para normalizar el valor de un atributo.
 
 Nuestro objetivo es actualizar a Rails 7.1, y vamos a configurar el dual-booting para poder hacer los cambios bien graduales y poder ejecutar todo en ambas versiones para poder iterar rápido.
 
 - Lo primero que hacemos es crear el archivo Gemfile.next, es un symlink que apunta a `Gemfile`.
 - Luego agregamos una función que vamos a usar como condicional en todas las partes que necesitemos especificar una versión distinta de una gema
 - Entonces el primer condicional es siempre el de la gema que queramos actualizar, en este caso Rails, ponemos `if next?` y configuramos distintas versiones en cada caso
-- Analizando las dependencias también notamos que la gema `composite_primary_keys` no soporta Rails 7.1, porque en Rails 7.1 se agregó el soporte de claves compuestas como parte de Rails, entonces necesitamos decirle a bundler que NO queremos esa gema en la próxima version: agregamos `unless next?`...
+- Supongamos que analizando las dependencias también notamos que la gema `normalizy` no anda en Rails 7.1 porque Rails agregó la funcionalidad de forma nativa (esto no es así, normalizy sigue funcionando pero supongámoslo con el objetivo del ejemplo)
 
 Ahora podemos correr `bundle install` con la versión nueva, pero en una de las slides anteriores comenté que esto así solo puede generar que se actualicen cosas que no necesitamos actualizar YA, agregando más puntos de posibles problemas.
 
@@ -90,9 +90,9 @@ Entonces volvamos un paso para atrás y veamos otra forma:
 - con `bundle update rails` le decimos a bundler que actualice rails y las cosas que necesite actualizar (existe la opción --conservative para ser incluso más restrictivos en qué actualiza)
 - ahora podemos ver que con esta forma, hay muchos menos cambios de versiones
 
-Otra cosa importante es que el Gemfile.next.lock NO include ya gema composit_primary_keys.
+Otra cosa importante es que el Gemfile.next.lock NO include ya gema normalizy.
 
-Por ahora sólo le dijimos a Bundler qué gemas queremos, pero tenemos un nuevo problema, la gema `composite_primary_keys` se configura distinta al feature nativo de Rails, entonces necesitamos agregar un condicional en el código. A mi me gusta usar este patrón, pero pueden usar cualquier forma que se les ocurra si no les gusta la idea de una variable global.
+Por ahora sólo le dijimos a Bundler qué gemas queremos, pero tenemos un nuevo problema, la gema `normalizy` se configura distinta al feature nativo de Rails, entonces necesitamos agregar un condicional en el código. A mi me gusta usar este patrón, pero pueden usar cualquier forma que se les ocurra si no les gusta la idea de una variable global.
 
 Ahora en el código podemos hacer esto:
 
